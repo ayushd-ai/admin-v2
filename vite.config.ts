@@ -42,9 +42,7 @@ export default defineConfig(({ mode }) => {
       },
       plugins: [
           react(),
-          tailwindcss({
-            config: './tailwind.config.ts'
-          }),
+          tailwindcss(),
       ],
       define: {
           'process.env': JSON.stringify(env),

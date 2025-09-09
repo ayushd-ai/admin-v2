@@ -1,11 +1,9 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAppSelector } from "@/hooks/useAppSelector";
 import { authAPI } from "@/services/api";
 
-interface AdminLayoutProps {
-  children: React.ReactNode;
-}
+
 
 export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);

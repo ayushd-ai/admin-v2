@@ -2,8 +2,8 @@ import React from "react"
 import asanaPng from '../assets/asana.png'
 import slackPng from '../assets/slack.png'
 import GithubPng from '../assets/github.png'
-import AirtablePng from '../assets/airtable.png'
-import AmplitudePng from '../assets/amplitude.png'
+// import AirtablePng from '../assets/airtable.png'
+// import AmplitudePng from '../assets/amplitude.png'
 import dropBoxPng from "../assets/dropbox.png"
 import confluencePng from '../assets/confluence.png'
 import gCalendarPng from '../assets/gCalendar.png'

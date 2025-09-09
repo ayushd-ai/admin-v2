@@ -1,21 +1,14 @@
-import React, { useEffect, useState, useMemo } from 'react'
+import  { useEffect, useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Select } from '../components/ui/select'
 import { adminApi } from '../services/adminApi'
 import { getToolIcon } from '../lib/icons'
-import type { ToolPrompt, OrganizationToolPrompts } from '../types/admin'
+import type {  OrganizationToolPrompts } from '../types/admin'
 
 interface ToolPromptFormData {
   [toolConnectorKey: string]: string
-}
-
-interface ParsedToolPrompt {
-  toolName: string
-  connectorType: string
-  toolPrompt: ToolPrompt
-  key: string
 }
 
 export default function ToolsPage() {

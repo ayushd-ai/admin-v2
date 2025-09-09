@@ -14,7 +14,6 @@ import type {
 } from '../types/admin'
 
 const API_BASE = '/admin'
-const TOOL_API = '/tool'
 
 export const adminApi = {
   // Organizations
