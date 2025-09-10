@@ -18,4 +18,5 @@ export const ROUTES = {
   LOGS: '/admin/logs',
   TOOLS: '/admin/tools',
   PROMPT: '/admin/prompts',
+  PROMPT_EDITOR: '/admin/prompts/editor/:identifier',
 } as const 

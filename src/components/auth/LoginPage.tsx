@@ -8,7 +8,7 @@ const LoginPage = () => {
 
   const handleLogin = () => {
     dispatch(setLoading(true))
-    window.location.href = `${BACKEND_API_URL}/auth/google`
+    window.location.href = `${BACKEND_API_URL}/auth/google?redirect_uri=http://localhost:5174`
   }
 
   return (

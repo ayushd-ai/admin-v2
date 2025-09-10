@@ -10,7 +10,21 @@ import type {
   ToolPrompt,
   ToolPromptResponse,
   ToolPromptUpdateRequest,
-  ToolPromptUpdateResponse
+  ToolPromptUpdateResponse,
+  Prompt,
+  CreatePromptRequest,
+  UpdatePromptRequest,
+  PromptTestRequest,
+  PromptTestResponse,
+  ClearCacheRequest,
+  PromptVersion,
+  PromptVersionHistory,
+  PromptDiff,
+  VersionComparison,
+  RevertPromptRequest,
+  RevertPromptResponse,
+  Connector,
+  ConnectorsResponse
 } from '../types/admin'
 
 const API_BASE = '/admin'
@@ -69,6 +83,11 @@ export const adminApi = {
     return response.data
   },
 
+  async getConnectors(): Promise<ConnectorsResponse> {
+    const response = await api.get(`${API_BASE}/connectors`)
+    return response.data
+  },
+
   async getTokenUsageStats(period: number = 30, organizationId?: string): Promise<TokenUsageStats> {
     const params: Record<string, any> = { period }
     if (organizationId) params.organizationId = organizationId
@@ -103,6 +122,81 @@ export const adminApi = {
     data: ToolPromptUpdateRequest
   ): Promise<ToolPromptUpdateResponse> {
     const response = await api.put(`${API_BASE}/tools/${toolName}/${connectorType}`, data)
+    return response.data
+  },
+
+  // Prompt Management
+  async getPrompts(): Promise<Prompt[]> {
+    const response = await api.get(`${API_BASE}/prompts`)
+    return response.data
+  },
+
+  async getPrompt(id: string): Promise<Prompt> {
+    const response = await api.get(`${API_BASE}/prompts/${id}`)
+    return response.data
+  },
+
+  async getPromptsByIdentifier(identifier: string): Promise<Prompt[]> {
+    const response = await api.get(`${API_BASE}/prompts/identifier/${identifier}`)
+    return response.data
+  },
+
+  async createPrompt(data: CreatePromptRequest): Promise<Prompt> {
+    const response = await api.post(`${API_BASE}/prompts`, data)
+    return response.data
+  },
+
+  async updatePrompt(id: string, data: UpdatePromptRequest): Promise<Prompt> {
+    const response = await api.put(`${API_BASE}/prompts/${id}`, data)
+    return response.data
+  },
+
+  async deletePrompt(id: string): Promise<{ message: string }> {
+    const response = await api.delete(`${API_BASE}/prompts/${id}`)
+    return response.data
+  },
+
+  async testPrompt(id: string, data: PromptTestRequest): Promise<PromptTestResponse> {
+    const response = await api.post(`${API_BASE}/prompts/${id}/test`, data)
+    return response.data
+  },
+
+  async clearPromptCache(data: ClearCacheRequest = {}): Promise<{ message: string }> {
+    const response = await api.post(`${API_BASE}/prompts/cache/clear`, data)
+    return response.data
+  },
+
+  // Version Management
+  async getPromptVersions(identifier: string): Promise<PromptVersionHistory> {
+    const response = await api.get(`${API_BASE}/prompts/identifier/${identifier}/versions`)
+    return response.data
+  },
+
+  async comparePromptVersions(identifier: string, fromVersion: number, toVersion: number): Promise<VersionComparison> {
+    const response = await api.get(`${API_BASE}/prompts/identifier/${identifier}/compare/${fromVersion}/${toVersion}`)
+    return response.data
+  },
+
+  async getPromptDiff(identifier: string, fromVersion: number, toVersion: number): Promise<PromptDiff> {
+    const response = await api.get(`${API_BASE}/prompts/identifier/${identifier}/diff/${fromVersion}/${toVersion}`)
+    return response.data
+  },
+
+  async revertPromptToVersion(identifier: string, version: number, data: RevertPromptRequest = {}): Promise<RevertPromptResponse> {
+    const response = await api.post(`${API_BASE}/prompts/identifier/${identifier}/revert/${version}`, data)
+    return response.data
+  },
+
+  async updatePromptTemplate(id: string, template: string, changeMessage?: string): Promise<Prompt> {
+    const response = await api.put(`${API_BASE}/prompts/${id}`, { 
+      template,
+      changeMessage 
+    })
+    return response.data
+  },
+
+  async getPromptVersion(identifier: string, version: number): Promise<PromptVersion> {
+    const response = await api.get(`${API_BASE}/prompts/identifier/${identifier}/version/${version}`)
     return response.data
   }
 } 

@@ -52,25 +52,32 @@ export interface User {
 export interface Connector {
   id: string
   name: string
-  userId: string
+  userId?: string
   organizationId: string
   type: ConnectorType
-  webhookEnabled: boolean
+  webhookEnabled?: boolean
   webhookConfig?: any
   metadata?: any
   accessToken?: string
   refreshToken?: string
   tokenExpiry?: string
-  lastSynced?: string
+  lastSynced?: string | null
   createdAt: string
   updatedAt: string
   status: ConnectorStatus
-  setupComplete: boolean
-  syncAble: boolean
-  completedOauth: boolean
-  shareable: boolean
-  sharedUsers: string[]
-  sharedGroups: string[]
+  setupComplete?: boolean
+  syncAble?: boolean
+  completedOauth?: boolean
+  shareable?: boolean
+  sharedUsers?: string[]
+  sharedGroups?: string[]
+  // Additional fields from API response
+  organizationName?: string
+  organizationDomain?: string
+  userName?: string
+  userEmail?: string
+  dataCount?: number
+  syncStatus?: string
 }
 
 export interface TokenUsage {
@@ -164,6 +171,16 @@ export interface PaginatedResponse<T> {
   }
 }
 
+export interface ConnectorsResponse {
+  connectors: Connector[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    pages: number
+  }
+}
+
 export type ConnectorType = 
   | 'googleDrive' | 'googleGmail' | 'slack' | 'linear' | 'notion' | 'postgres' 
   | 'googleCalendar' | 'github' | 'mysql' | 'asana' | 'freshdesk' | 'freshchat' 
@@ -208,4 +225,109 @@ export interface ToolPromptUpdateResponse {
   message: string
   toolName: string
   connectorType: string
+}
+
+// Prompt Management Types
+export interface Prompt {
+  id: string
+  identifier: string
+  name: string
+  description?: string
+  template: string
+  variables?: Record<string, any>
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreatePromptRequest {
+  identifier: string
+  name: string
+  description?: string
+  template: string
+  variables?: Record<string, any>
+  isActive?: boolean
+}
+
+export interface UpdatePromptRequest {
+  name?: string
+  description?: string
+  template?: string
+  variables?: Record<string, any>
+  isActive?: boolean
+}
+
+export interface PromptTestRequest {
+  variables?: Record<string, any>
+}
+
+export interface PromptTestResponse {
+  promptId: string
+  identifier: string
+  template: string
+  variables: Record<string, any>
+  renderedPrompt: string
+}
+
+export interface ClearCacheRequest {
+  identifier?: string
+}
+
+// Version Management Types
+export interface PromptVersion {
+  id: string
+  version: number
+  template: string
+  isActive: boolean
+  createdAt: string
+  createdBy?: string
+  promptId: string
+  changeMessage?: string
+}
+
+export interface PromptVersionHistory {
+  identifier: string
+  currentVersion: number
+  versions: PromptVersion[]
+}
+
+export interface PromptDiffLine {
+  lineNumber: number
+  oldLine: string
+  newLine: string
+  type: 'added' | 'removed' | 'unchanged' | 'modified'
+}
+
+export interface PromptDiff {
+  identifier: string
+  version1: number
+  version2: number
+  templateDiff: PromptDiffLine[]
+  summary: {
+    linesChanged: number
+    nameChanged: boolean
+    variablesChanged: boolean
+  }
+}
+
+export interface VersionComparison {
+  identifier: string
+  version1: PromptVersion
+  version2: PromptVersion
+  templateDiff: PromptDiffLine[]
+  summary: {
+    linesChanged: number
+    nameChanged: boolean
+    variablesChanged: boolean
+  }
+}
+
+export interface RevertPromptRequest {
+  changeMessage?: string
+}
+
+export interface RevertPromptResponse {
+  success: boolean
+  newVersion: PromptVersion
+  message: string
 } 

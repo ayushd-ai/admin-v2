@@ -9,6 +9,8 @@ import UsersPage from '@/pages/UsersPage'
 import TokenUsagePage from '@/pages/TokenUsagePage'
 import ConnectorsPage from '@/pages/ConnectorsPage'
 import ToolsPage from '@/pages/ToolsPage'
+import PromptsPage from '@/pages/PromptsPage'
+import PromptEditor from '@/pages/PromptEditor'
 import LogsPage from '@/pages/LogsPage'
 import { ROUTES } from '@/lib/constants'
 import './App.css'
@@ -36,7 +38,7 @@ const AppContent = () => {
             element={<LoginPage />}
           />
           <Route
-            path={ROUTES.HOME}
+            path="/admin"
             element={
               <ProtectedRoute>
                 <AdminLayout />
@@ -44,31 +46,19 @@ const AppContent = () => {
             }
           >
             <Route index element={<AdminDashboard />} />
-            <Route path={ROUTES.ORGANIZATIONS} element={<OrganizationsPage />} />
-            <Route
-              path={ROUTES.USERS}
-              element={
-                <UsersPage />
-              }
-            />
-            <Route
-              path={ROUTES.TOKEN_USAGE}
-              element={<TokenUsagePage />}
-            />
-            <Route
-              path={ROUTES.CONNECTORS}
-              element={<ConnectorsPage />}
-            />
-            <Route
-              path={ROUTES.TOOLS}
-              element={<ToolsPage />}
-            />
-            <Route
-              path={ROUTES.LOGS}
-              element={<LogsPage />}
-            />
-
+            <Route path="organizations" element={<OrganizationsPage />} />
+            <Route path="users" element={<UsersPage />} />
+            <Route path="token-usage" element={<TokenUsagePage />} />
+            <Route path="connectors" element={<ConnectorsPage />} />
+            <Route path="tools" element={<ToolsPage />} />
+            <Route path="prompts/editor/:identifier" element={<PromptEditor />} />
+            <Route path="prompts" element={<PromptsPage />} />
+            <Route path="logs" element={<LogsPage />} />
           </Route>
+          <Route
+            path={ROUTES.HOME}
+            element={<Navigate to="/admin" replace />}
+          />
 
 
           {/* Admin Routes */}

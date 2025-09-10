@@ -1,24 +1,32 @@
 import  { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/ui/table'
 import { adminApi } from '../services/adminApi'
-import type { ConnectorStats } from '../types/admin'
+import type { ConnectorStats, Connector, ConnectorsResponse } from '../types/admin'
 
 export default function ConnectorsPage() {
   const [connectorStats, setConnectorStats] = useState<ConnectorStats | null>(null)
+  const [connectors, setConnectors] = useState<Connector[]>([])
+  const [connectorsResponse, setConnectorsResponse] = useState<ConnectorsResponse | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetchConnectorStats()
+    fetchData()
   }, [])
 
-  const fetchConnectorStats = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true)
-      const data = await adminApi.getConnectorStats()
-      setConnectorStats(data)
+      const [statsData, connectorsData] = await Promise.all([
+        adminApi.getConnectorStats(),
+        adminApi.getConnectors()
+      ])
+      setConnectorStats(statsData)
+      setConnectorsResponse(connectorsData)
+      setConnectors(connectorsData.connectors) // Extract connectors array from response
     } catch (error) {
-      console.error('Failed to fetch connector stats:', error)
+      console.error('Failed to fetch connector data:', error)
     } finally {
       setLoading(false)
     }
@@ -47,6 +55,21 @@ export default function ConnectorsPage() {
       mysql: 'M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4'
     }
     return icons[type] || 'M13 10V3L4 14h7v7l9-11h-7z'
+  }
+
+  const formatConnectorType = (type: string) => {
+    return type.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).trim()
+  }
+
+  const formatDate = (date: string | null | undefined) => {
+    if (!date) return 'Never'
+    return new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
   }
 
   if (loading) {
@@ -108,41 +131,107 @@ export default function ConnectorsPage() {
 
       </div>
 
-      {/* Connector Type Breakdown */}
+      {/* Connectors Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Connector Types</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>All Connectors</CardTitle>
+            {connectorsResponse && (
+              <div className="text-sm text-gray-500">
+                Showing {connectorsResponse.connectors.length} of {connectorsResponse.pagination.total} connectors
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {connectorStats?.connectorStats.map((stat, index) => (
-              <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center">
-                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
-                    <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={getConnectorTypeIcon(stat.type)} />
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="font-medium text-gray-900 capitalize">
-                      {stat.type.replace(/([A-Z])/g, ' $1').trim()}
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Organization</TableHead>
+                <TableHead>User</TableHead>
+                <TableHead>Data Count</TableHead>
+                <TableHead>Last Synced</TableHead>
+                <TableHead>Created</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {connectors.map((connector) => (
+                <TableRow key={connector.id}>
+                  <TableCell>
+                    <div className="flex items-center">
+                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                        <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={getConnectorTypeIcon(connector.type)} />
+                        </svg>
+                      </div>
+                      <div>
+                        <div className="font-medium text-gray-900">{connector.name}</div>
+                        <div className="text-sm text-gray-500">{connector.id}</div>
+                      </div>
                     </div>
-                    <div className="text-sm text-gray-500">
-                      Status: {stat.status}
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm font-medium text-gray-900">
+                      {formatConnectorType(connector.type)}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={getStatusColor(connector.status) as any}>
+                      {connector.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">
+                        {connector.organizationName || 'Unknown'}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {connector.organizationDomain || connector.organizationId}
+                      </div>
                     </div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-lg font-semibold text-gray-900">
-                    {stat._count.id}
-                  </div>
-                  <Badge variant={getStatusColor(stat.status) as any}>
-                    {stat.status}
-                  </Badge>
-                </div>
-              </div>
-            ))}
-          </div>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm text-gray-600">
+                      {formatDate(connector.lastSynced)}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">
+                        {connector.userName || 'Unknown'}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {connector.userEmail || '—'}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center">
+                      <span className="text-sm font-medium text-gray-900">
+                        {connector.dataCount?.toLocaleString() || '0'}
+                      </span>
+                      {connector.syncStatus && (
+                        <Badge 
+                          variant={connector.syncStatus === 'recent' ? 'success' : connector.syncStatus === 'never' ? 'error' : 'warning'} 
+                          className="ml-2 text-xs"
+                        >
+                          {connector.syncStatus}
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm text-gray-600">
+                      {formatDate(connector.createdAt)}
+                    </span>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 
