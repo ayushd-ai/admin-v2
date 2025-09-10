@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button'
-import { BACKEND_API_URL } from '@/lib/constants'
+import { BACKEND_API_URL, FRONTEND_URL } from '@/lib/constants'
 import { useAppDispatch } from '@/hooks/useAppDispatch'
 import { setLoading } from '@/store/slices/authSlice'
 
@@ -8,7 +8,7 @@ const LoginPage = () => {
 
   const handleLogin = () => {
     dispatch(setLoading(true))
-    window.location.href = `${BACKEND_API_URL}/auth/google?redirect_uri=http://localhost:5174`
+    window.location.href = `${BACKEND_API_URL}/auth/google?redirect_uri=${FRONTEND_URL}`
   }
 
   return (
