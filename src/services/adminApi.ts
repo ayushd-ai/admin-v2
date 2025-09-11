@@ -313,5 +313,10 @@ export const adminApi = {
       onError && onError(err)
       throw err
     }
+  },
+
+  async getPromptTokenSize(identifier: string): Promise<import('../types/admin').PromptTokenSizeResponse> {
+    const response = await api.get(`${API_BASE}/prompts/token-size/${encodeURIComponent(identifier)}`)
+    return response.data
   }
 } 

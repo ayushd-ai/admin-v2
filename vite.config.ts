@@ -44,6 +44,10 @@ export default defineConfig(({ mode }) => {
           react(),
           tailwindcss(),
       ],
+      optimizeDeps: {
+        include: ['diff2html']
+
+      },
       define: {
           'process.env': JSON.stringify(env),
       },

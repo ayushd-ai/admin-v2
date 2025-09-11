@@ -387,4 +387,14 @@ export interface AIChatDeltaEvent {
   sequenceNumber: number
   patches: AIChatDeltaPatch[]
   timestamp: string
+}
+
+// Token size estimate response
+export interface PromptTokenSizeResponse {
+  promptId: string
+  identifier: string
+  templateCharacters: number
+  templateTokens: number
+  variablesTokens: number
+  totalEstimatedTokens: number
 } 

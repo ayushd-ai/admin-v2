@@ -161,7 +161,15 @@ export default function ConnectorsPage() {
                 <TableRow key={connector.id}>
                   <TableCell>
                     <div className="flex items-center">
-                        <div className="font-medium text-gray-900">{connector.name}</div>
+                        <div className="font-medium text-gray-900">
+                          {connector.name && connector.name.length > 30 ? (
+                            <span title={connector.name}>
+                              {connector.name.substring(0, 30)}&hellip;
+                            </span>
+                          ) : (
+                            connector.name
+                          )}
+                        </div>
                     </div>
                   </TableCell>
                   <TableCell>
