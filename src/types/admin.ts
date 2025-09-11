@@ -330,4 +330,71 @@ export interface RevertPromptResponse {
   success: boolean
   newVersion: PromptVersion
   message: string
+}
+
+// AI Chat Types
+export type AIChatRole = 'system' | 'user' | 'assistant'
+
+export interface AIChatMessage {
+  role: AIChatRole
+  content: string
+}
+
+export interface AIChatRequest {
+  messages: AIChatMessage[]
+  promptIdentifier?: string
+  selectionText?: string
+  chatId?: string
+  query?: string
+  llmProvider?: string
+  llmModel?: string
+  previousMessageId?: string
+  history?: any[]
+}
+
+export interface AIChatEventChunk {
+  text?: string
+  // If server sends JSON events
+  type?: 'message' | 'done' | 'error'
+  content?: string
+  error?: string
+}
+
+// Prompt Chat list and messages
+export interface PromptChatListItem {
+  id: string
+  title?: string
+  promptId?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PromptChatMessage {
+  id: string
+  chatId: string
+  role: AIChatRole
+  content: string
+  createdAt: string
+}
+
+export interface AIChatDeltaPatch {
+  op: 'add' | 'remove' | 'replace' | 'move' | 'copy' | 'test' | 'append_string'
+  p: string
+  v?: any
+}
+
+export interface AIChatDeltaEvent {
+  sequenceNumber: number
+  patches: AIChatDeltaPatch[]
+  timestamp: string
+}
+
+// Token size estimate response
+export interface PromptTokenSizeResponse {
+  promptId: string
+  identifier: string
+  templateCharacters: number
+  templateTokens: number
+  variablesTokens: number
+  totalEstimatedTokens: number
 } 

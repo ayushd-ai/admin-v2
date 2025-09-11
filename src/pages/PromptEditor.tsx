@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -10,11 +10,12 @@ import type {
   Prompt,
   PromptVersionHistory,
   PromptDiff,
-  VersionComparison,
-  PromptVersion,
   CreatePromptRequest,
 } from "../types/admin";
-import { MenuIcon, MoveLeft } from "lucide-react";
+import { BotIcon,  MenuIcon, MoveLeft } from "lucide-react";
+import { ChatWidget } from "@/components/chat/ChatWidget";
+import { html as diffHtml } from 'diff2html/lib-esm/diff2html';
+import 'diff2html/bundles/css/diff2html.min.css';
 
 interface EditorState {
   content: string;
@@ -77,6 +78,25 @@ export default function PromptEditor() {
   const [showVersionPanel, setShowVersionPanel] = useState(false);
   const [lineNumbers, setLineNumbers] = useState(true);
   const [loadingVersion, setLoadingVersion] = useState(false);
+  // Chat state
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [selectionToChat, setSelectionToChat] = useState<string | undefined>(undefined);
+  const textareaRef = useState<HTMLTextAreaElement | null>(null)[0];
+  const setTextareaRef = (el: HTMLTextAreaElement | null) => {
+  };
+
+  // Preview diff state
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [previewGenerating, setPreviewGenerating] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+
+  // Token estimate state
+  const [tokenEstimate, setTokenEstimate] = useState<number | null>(null);
+  const [estimatingTokens, setEstimatingTokens] = useState(false);
+  const [displayedTokens, setDisplayedTokens] = useState(0);
+  const loadingCounterRef = useRef<number | null>(null);
+  const settleIntervalRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!isCreationMode) {
@@ -130,6 +150,43 @@ export default function PromptEditor() {
       }
     }
   }, [identifier, prompts, isCreationMode]);
+
+  // Reset token estimate state when switching prompts/identifier
+  useEffect(() => {
+    setTokenEstimate(null);
+    setDisplayedTokens(0);
+    setEstimatingTokens(false);
+    if (loadingCounterRef.current) {
+      clearInterval(loadingCounterRef.current);
+      loadingCounterRef.current = null;
+    }
+    if (settleIntervalRef.current) {
+      clearInterval(settleIntervalRef.current);
+      settleIntervalRef.current = null;
+    }
+  }, [identifier]);
+
+  // Auto-fetch token estimate when opening an identifier (edit mode)
+  useEffect(() => {
+    if (identifier && !isCreationMode) {
+      handleEstimateTokens();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identifier, isCreationMode]);
+
+  // Cleanup intervals on unmount
+  useEffect(() => {
+    return () => {
+      if (loadingCounterRef.current) {
+        clearInterval(loadingCounterRef.current);
+        loadingCounterRef.current = null;
+      }
+      if (settleIntervalRef.current) {
+        clearInterval(settleIntervalRef.current);
+        settleIntervalRef.current = null;
+      }
+    };
+  }, []);
 
   const fetchPrompts = async () => {
     try {
@@ -272,6 +329,15 @@ export default function PromptEditor() {
         await fetchPrompts();
         if (identifier) {
           await fetchVersionHistory(identifier);
+          // Refresh token estimate after saving
+          try {
+            const r = await adminApi.getPromptTokenSize(identifier);
+            const t = r?.totalEstimatedTokens ?? 0;
+            setTokenEstimate(t);
+            setDisplayedTokens(t);
+          } catch {
+            // ignore token estimate refresh errors
+          }
         }
       } catch (error: any) {
         console.error("Failed to save prompt:", error);
@@ -461,6 +527,131 @@ export default function PromptEditor() {
     );
   };
 
+  // Build a unified diff between two strings, line-based
+  const generateUnifiedDiff = (oldStr: string, newStr: string, fileName: string) => {
+    const a = oldStr.split('\n');
+    const b = newStr.split('\n');
+    const n = a.length;
+    const m = b.length;
+    const dp: number[][] = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+
+    for (let i = n - 1; i >= 0; i--) {
+      for (let j = m - 1; j >= 0; j--) {
+        if (a[i] === b[j]) dp[i][j] = dp[i + 1][j + 1] + 1;
+        else dp[i][j] = Math.max(dp[i + 1][j], dp[i][j + 1]);
+      }
+    }
+
+    const lines: string[] = [];
+    let i = 0, j = 0;
+    while (i < n && j < m) {
+      if (a[i] === b[j]) {
+        lines.push(' ' + a[i]);
+        i++; j++;
+      } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+        lines.push('-' + a[i]);
+        i++;
+      } else {
+        lines.push('+' + b[j]);
+        j++;
+      }
+    }
+    while (i < n) { lines.push('-' + a[i]); i++; }
+    while (j < m) { lines.push('+' + b[j]); j++; }
+
+    const oldStart = n > 0 ? 1 : 0;
+    const newStart = m > 0 ? 1 : 0;
+    const header = `--- a/${fileName}\n+++ b/${fileName}\n@@ -${oldStart},${n} +${newStart},${m} @@\n`;
+    return header + lines.join('\n') + '\n';
+  };
+
+  const openPreview = () => {
+    if (selectedVersion !== null || loadingVersion) return;
+    try {
+      setPreviewGenerating(true);
+      setPreviewError(null);
+      const before = isCreationMode ? '' : (currentPrompt?.template || '');
+      const after = editorState.content || '';
+      const fileName = (currentPrompt?.identifier || creationState.identifier || 'prompt.txt') + '.txt';
+      const unified = generateUnifiedDiff(before, after, fileName);
+      const html = diffHtml(unified, {
+        // inputFormat: 'diff',
+        drawFileList: false,
+        matching: 'lines',
+        outputFormat: 'line-by-line',
+      });
+      setPreviewHtml(html);
+      setIsPreviewOpen(true);
+    } catch (e: any) {
+      console.error('Failed to generate preview diff:', e);
+      setPreviewError('Failed to generate preview');
+    } finally {
+      setPreviewGenerating(false);
+    }
+  };
+
+  // Token estimate helpers
+  const startLoadingCounter = (startFrom: number) => {
+    setDisplayedTokens(startFrom);
+    if (loadingCounterRef.current) clearInterval(loadingCounterRef.current);
+    loadingCounterRef.current = window.setInterval(() => {
+      setDisplayedTokens(prev => {
+        const increment = Math.max(1, Math.floor(prev * 0.02) + 3);
+        const cap = (editorState.content?.length || 0) * 2 + 100;
+        const next = prev + increment;
+        return next > cap ? cap : next;
+      });
+    }, 60);
+  };
+
+  const smoothSettleTo = (finalValue: number) => {
+    if (loadingCounterRef.current) {
+      clearInterval(loadingCounterRef.current);
+      loadingCounterRef.current = null;
+    }
+    if (settleIntervalRef.current) clearInterval(settleIntervalRef.current);
+    const durationMs = 400;
+    const stepMs = 16;
+    const steps = Math.ceil(durationMs / stepMs);
+    let currentStep = 0;
+    const start = displayedTokens;
+    const delta = finalValue - start;
+    settleIntervalRef.current = window.setInterval(() => {
+      currentStep += 1;
+      const progress = Math.min(1, currentStep / steps);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const value = Math.round(start + delta * eased);
+      setDisplayedTokens(value);
+      if (progress >= 1) {
+        if (settleIntervalRef.current) {
+          clearInterval(settleIntervalRef.current);
+          settleIntervalRef.current = null;
+        }
+      }
+    }, stepMs);
+  };
+
+  const handleEstimateTokens = async () => {
+    if (!identifier || isCreationMode || estimatingTokens) return;
+    try {
+      setEstimatingTokens(true);
+      startLoadingCounter(tokenEstimate ?? 0);
+      const res = await adminApi.getPromptTokenSize(identifier);
+      const tokens = res?.totalEstimatedTokens ?? 0;
+      setTokenEstimate(tokens);
+      smoothSettleTo(tokens);
+    } catch (err) {
+      console.error('Failed to fetch token estimate', err);
+      setError('Failed to fetch token estimate');
+      if (loadingCounterRef.current) {
+        clearInterval(loadingCounterRef.current);
+        loadingCounterRef.current = null;
+      }
+    } finally {
+      setEstimatingTokens(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -592,7 +783,7 @@ export default function PromptEditor() {
                     </div>
                   ) : (
                     <h1 
-                      className="text-2xl text-start font-bold cursor-pointer hover:text-blue-600 transition-colors"
+                      className="text-2xl text-start font-bold cursor-pointer hover:text-gray-600 transition-colors"
                       onClick={() => setIsEditingName(true)}
                       title="Click to edit prompt name"
                     >
@@ -644,22 +835,32 @@ export default function PromptEditor() {
                   History
                 </Button>
               )}
-              <Button
-                onClick={handleSave}
-                disabled={
-                  saving || 
-                  loadingVersion ||
-                  (!isCreationMode && (!editorState.isDirty || selectedVersion !== null)) ||
-                  (isCreationMode && (!creationState.identifier || !creationState.name || !editorState.content))
-                }
-                className="bg-green-600 hover:bg-green-700"
-              >
-                {saving ? 
-                  (isCreationMode ? "Creating..." : "Saving...") : 
-                  loadingVersion ? "Loading..." : 
-                  selectedVersion !== null ? "Viewing History" : 
-                  isCreationMode ? "Create Prompt" : "Save"}
-              </Button>
+              {(selectedVersion === null) && (editorState.isDirty || (isCreationMode && editorState.content !== "")) ? (
+                <Button
+                  onClick={openPreview}
+                  disabled={saving || loadingVersion}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  Preview
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleSave}
+                  disabled={
+                    saving || 
+                    loadingVersion ||
+                    (!isCreationMode && (!editorState.isDirty || selectedVersion !== null)) ||
+                    (isCreationMode && (!creationState.identifier || !creationState.name || !editorState.content))
+                  }
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  {saving ? 
+                    (isCreationMode ? "Creating..." : "Saving...") : 
+                    loadingVersion ? "Loading..." : 
+                    selectedVersion !== null ? "Viewing History" : 
+                    isCreationMode ? "Create Prompt" : "Save"}
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -725,6 +926,14 @@ export default function PromptEditor() {
                 <span className="text-gray-600">
                   {editorState.content?.length || 0} characters
                 </span>
+                 <span 
+                  className="text-gray-600 inline-flex items-center rounded px-2 py-1"
+                >
+                  <span className="mr-1">Token estimate:</span>
+                  <span className={`  'text-gray-800'}`}>
+                    {estimatingTokens ? displayedTokens : (tokenEstimate ?? '—')}
+                  </span>
+                </span>
                 {loadingVersion && (
                   <span className="text-blue-600 font-medium">
                     Loading version content...
@@ -745,6 +954,18 @@ export default function PromptEditor() {
                   />
                   <span>Line numbers</span>
                 </label>
+                {!compareMode && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      // If selection exists, pass it; otherwise open chat empty
+                      setIsChatOpen(true)
+                    }}
+                  >
+                    Add selection to chat
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -771,6 +992,23 @@ export default function PromptEditor() {
                       value={editorState.content || ""}
                       onChange={(e) => handleEditorChange(e.target.value)}
                       readOnly={selectedVersion !== null}
+                      // events
+                      onMouseUp={(e) => {
+                        const target = e.currentTarget as HTMLTextAreaElement
+                        const start = target.selectionStart
+                        const end = target.selectionEnd
+                        if (start !== end) {
+                          setSelectionToChat((editorState.content || '').slice(start, end))
+                        }
+                      }}
+                      onKeyUp={(e) => {
+                        const target = e.currentTarget as HTMLTextAreaElement
+                        const start = target.selectionStart
+                        const end = target.selectionEnd
+                        if (start !== end) {
+                          setSelectionToChat((editorState.content || '').slice(start, end))
+                        }
+                      }}
                       className={`w-full h-full p-4 border-none outline-none resize-none font-mono text-sm ${
                         selectedVersion !== null 
                           ? 'bg-blue-50 cursor-default text-gray-700' 
@@ -915,18 +1153,75 @@ export default function PromptEditor() {
       </div>
 
       {/* Floating Chat Button */}
-      <div className="fixed bottom-6 right-6">
+      <div className="fixed bottom-6 left-6 z-50">
         <Button
-          size="lg"
-          className="rounded-full w-14 h-14 shadow-lg bg-blue-600 hover:bg-blue-700"
+          variant='ghost'
+          size="icon"
+          className="rounded-full shadow-md border border-gray-300 bg-transparent hover:bg-gray-100 text-gray-700"
           onClick={() => {
-            // TODO: Implement chat functionality
-            console.log("Chat button clicked - to be implemented");
+            setIsChatOpen(true)
           }}
         >
-          💬
+          <BotIcon  className="w-5 h-5" />
         </Button>
       </div>
+
+      {currentPrompt && (
+        <ChatWidget
+          open={isChatOpen}
+          onClose={() => setIsChatOpen(false)}
+          promptId={currentPrompt.id}
+          promptIdentifier={currentPrompt.identifier}
+          appendText={selectionToChat}
+          onAppendConsumed={() => setSelectionToChat(undefined)}
+        />
+      )}
+
+      {/* Preview Modal */}
+      {isPreviewOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setIsPreviewOpen(false)}></div>
+          <div className="relative bg-white w-[90vw] max-w-5xl max-h-[80vh] rounded-lg shadow-lg flex flex-col">
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Preview changes</h3>
+              <button className="text-gray-500 hover:text-gray-700" onClick={() => setIsPreviewOpen(false)}>×</button>
+            </div>
+            <div className="flex-1 overflow-auto">
+              <style>{`
+                .diff2html--wrapper .d2h-code-linenumber,
+                .diff2html--wrapper .d2h-code-side-linenumber,
+                .diff2html--wrapper .d2h-info {
+                  position: static !important;
+                  left: auto !important;
+                  right: auto !important;
+                  top: auto !important;
+                  z-index: auto !important;
+                }
+              `}</style>
+              {previewGenerating ? (
+                <div className="p-6 text-gray-600">Generating preview...</div>
+              ) : previewError ? (
+                <div className="p-6 text-red-600">{previewError}</div>
+              ) : (
+                <div className="diff2html--wrapper" dangerouslySetInnerHTML={{ __html: previewHtml || '' }} />
+              )}
+            </div>
+            <div className="p-4 border-t border-gray-200 flex items-center justify-end space-x-2">
+              <Button variant="outline" onClick={() => setIsPreviewOpen(false)}>Back</Button>
+              <Button
+                onClick={async () => {
+                  await handleSave();
+                  setIsPreviewOpen(false);
+                }}
+                disabled={saving || (isCreationMode && (!creationState.identifier || !creationState.name || !editorState.content))}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                {saving ? (isCreationMode ? 'Creating...' : 'Saving...') : (isCreationMode ? 'Create Prompt' : 'Save')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Error Display */}
       {error && (

@@ -11,4 +11,5 @@ body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background-color: #ffffff;
   color: #111827;
+  scroll-behavior: smooth;
 }
