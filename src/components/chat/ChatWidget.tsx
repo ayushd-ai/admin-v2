@@ -622,15 +622,23 @@ export function ChatWidget({
                       <textarea
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                            e.preventDefault();
+                            if (input.trim() && !isStreaming) {
+                              sendMessage();
+                            }
+                          }
+                        }}
                         className="flex-1 border rounded-md p-2 text-sm h-24 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Type your message..."
+                        placeholder="Type your message… Enter to send, Shift+Enter for newline"
                       />
                       <Button
                         onClick={sendMessage}
                         disabled={!input.trim() || isStreaming}
                         className="bg-blue-600 hover:bg-blue-700"
                       >
-                        {isStreaming ? "Streaming..." : "Send"}
+                        Send
                       </Button>
                     </div>
                   </div>
