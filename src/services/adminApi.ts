@@ -198,5 +198,120 @@ export const adminApi = {
   async getPromptVersion(identifier: string, version: number): Promise<PromptVersion> {
     const response = await api.get(`${API_BASE}/prompts/identifier/${identifier}/version/${version}`)
     return response.data
+  },
+  async getPromptChats(): Promise<{ data: import('../types/admin').PromptChatListItem[]; page: number; pageSize: number; total: number; totalPages: number; }> {
+    const response = await api.get(`${API_BASE}/prompts/chats`)
+    return response.data
+  },
+
+  async getPromptChatMessages(chatId: string): Promise<import('../types/admin').AIChatMessage[]> {
+    const response = await api.get(`${API_BASE}/prompts/chat/${encodeURIComponent(chatId)}/messages`)
+    const payload = response.data
+    const list = Array.isArray(payload) ? payload : payload?.messages || payload?.data || []
+    const toRole = (r: any): import('../types/admin').AIChatRole => {
+      const v = String(r || '').toLowerCase()
+      return v === 'user' ? 'user' : 'assistant'
+    }
+    const blocksToText = (content: any): string => {
+      const blocks = content?.blocks
+      if (Array.isArray(blocks)) {
+        return blocks
+          .filter((b: any) => b?.type === 'text' && typeof b?.content === 'string')
+          .map((b: any) => b.content)
+          .join('\n')
+      }
+      if (typeof content === 'string') return content
+      return ''
+    }
+    return list.map((m: any) => ({
+      role: toRole(m.role),
+      content: blocksToText(m.content),
+    }))
+  },
+
+  async streamPromptAIChat(
+    promptId: string,
+    body: import('../types/admin').AIChatRequest,
+    onChunk: (text: string) => void,
+    onError?: (error: any) => void,
+    onDone?: () => void,
+    onDelta?: (eventName: string, payload: any) => void,
+    onOpen?: (chatId: string | null, response: Response) => void,
+  ): Promise<void> {
+    const url = `${api.defaults.baseURL}${API_BASE}/prompts/${encodeURIComponent(promptId)}/ai-chat`
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream',
+          // Forward cookies for session
+        },
+        body: JSON.stringify(body),
+        credentials: 'include',
+      })
+      if (!response.ok || !response.body) {
+        throw new Error(`Chat stream failed: ${response.status} ${response.statusText}`)
+      }
+      const chatIdHeader = response.headers.get('x-chat-id')
+      onOpen && onOpen(chatIdHeader, response)
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder('utf-8')
+      let done = false
+      let buffer = ''
+      let currentEvent: string | null = null
+      while (!done) {
+        const { value, done: readerDone } = await reader.read()
+        done = readerDone
+        if (value) {
+          buffer += decoder.decode(value, { stream: true })
+          // Basic SSE line parsing supporting event: and data:
+          const lines = buffer.split('\n')
+          // Keep the last partial line in buffer
+          buffer = lines.pop() || ''
+          for (const line of lines) {
+            const trimmed = line.trim()
+            if (!trimmed) continue
+            if (trimmed.startsWith('event:')) {
+              currentEvent = trimmed.slice(6).trim()
+              continue
+            }
+            if (trimmed.startsWith('data:')) {
+              const payload = trimmed.slice(5).trim()
+              if (payload === '[DONE]') {
+                onDone && onDone()
+                return
+              }
+              try {
+                const evt = JSON.parse(payload)
+                if (currentEvent && onDelta) {
+                  onDelta(currentEvent, evt)
+                } else {
+                  if (typeof evt === 'string') {
+                    onChunk(evt)
+                  } else if (evt?.text) {
+                    onChunk(evt.text)
+                  } else if (evt?.content) {
+                    onChunk(evt.content)
+                  } else if (evt?.type === 'error') {
+                    onError && onError(evt.error || 'Unknown error')
+                  }
+                }
+              } catch {
+                // Fallback to raw text
+                onChunk(payload)
+              }
+            } else {
+              // Ignore other lines
+              continue
+            }
+          }
+        }
+      }
+      onDone && onDone()
+    } catch (err) {
+      onError && onError(err)
+      throw err
+    }
   }
 } 

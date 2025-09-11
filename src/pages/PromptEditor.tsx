@@ -10,11 +10,10 @@ import type {
   Prompt,
   PromptVersionHistory,
   PromptDiff,
-  VersionComparison,
-  PromptVersion,
   CreatePromptRequest,
 } from "../types/admin";
-import { MenuIcon, MoveLeft } from "lucide-react";
+import { BotIcon,  MenuIcon, MoveLeft } from "lucide-react";
+import { ChatWidget } from "@/components/chat/ChatWidget";
 
 interface EditorState {
   content: string;
@@ -77,6 +76,12 @@ export default function PromptEditor() {
   const [showVersionPanel, setShowVersionPanel] = useState(false);
   const [lineNumbers, setLineNumbers] = useState(true);
   const [loadingVersion, setLoadingVersion] = useState(false);
+  // Chat state
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [selectionToChat, setSelectionToChat] = useState<string | undefined>(undefined);
+  const textareaRef = useState<HTMLTextAreaElement | null>(null)[0];
+  const setTextareaRef = (el: HTMLTextAreaElement | null) => {
+  };
 
   useEffect(() => {
     if (!isCreationMode) {
@@ -745,6 +750,18 @@ export default function PromptEditor() {
                   />
                   <span>Line numbers</span>
                 </label>
+                {!compareMode && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      // If selection exists, pass it; otherwise open chat empty
+                      setIsChatOpen(true)
+                    }}
+                  >
+                    Add selection to chat
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -771,6 +788,23 @@ export default function PromptEditor() {
                       value={editorState.content || ""}
                       onChange={(e) => handleEditorChange(e.target.value)}
                       readOnly={selectedVersion !== null}
+                      // events
+                      onMouseUp={(e) => {
+                        const target = e.currentTarget as HTMLTextAreaElement
+                        const start = target.selectionStart
+                        const end = target.selectionEnd
+                        if (start !== end) {
+                          setSelectionToChat((editorState.content || '').slice(start, end))
+                        }
+                      }}
+                      onKeyUp={(e) => {
+                        const target = e.currentTarget as HTMLTextAreaElement
+                        const start = target.selectionStart
+                        const end = target.selectionEnd
+                        if (start !== end) {
+                          setSelectionToChat((editorState.content || '').slice(start, end))
+                        }
+                      }}
                       className={`w-full h-full p-4 border-none outline-none resize-none font-mono text-sm ${
                         selectedVersion !== null 
                           ? 'bg-blue-50 cursor-default text-gray-700' 
@@ -915,18 +949,29 @@ export default function PromptEditor() {
       </div>
 
       {/* Floating Chat Button */}
-      <div className="fixed bottom-6 right-6">
+      <div className="fixed bottom-6 left-6 z-50">
         <Button
-          size="lg"
-          className="rounded-full w-14 h-14 shadow-lg bg-blue-600 hover:bg-blue-700"
+          variant='ghost'
+          size="icon"
+          className="rounded-full shadow-md border border-gray-300 bg-transparent hover:bg-gray-100 text-gray-700"
           onClick={() => {
-            // TODO: Implement chat functionality
-            console.log("Chat button clicked - to be implemented");
+            setIsChatOpen(true)
           }}
         >
-          💬
+          <BotIcon  className="w-5 h-5" />
         </Button>
       </div>
+
+      {currentPrompt && (
+        <ChatWidget
+          open={isChatOpen}
+          onClose={() => setIsChatOpen(false)}
+          promptId={currentPrompt.id}
+          promptIdentifier={currentPrompt.identifier}
+          appendText={selectionToChat}
+          onAppendConsumed={() => setSelectionToChat(undefined)}
+        />
+      )}
 
       {/* Error Display */}
       {error && (
