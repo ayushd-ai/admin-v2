@@ -152,7 +152,6 @@ export default function ConnectorsPage() {
                 <TableHead>Status</TableHead>
                 <TableHead>Organization</TableHead>
                 <TableHead>User</TableHead>
-                <TableHead>Data Count</TableHead>
                 <TableHead>Last Synced</TableHead>
                 <TableHead>Created</TableHead>
               </TableRow>
@@ -162,15 +161,7 @@ export default function ConnectorsPage() {
                 <TableRow key={connector.id}>
                   <TableCell>
                     <div className="flex items-center">
-                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
-                        <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={getConnectorTypeIcon(connector.type)} />
-                        </svg>
-                      </div>
-                      <div>
                         <div className="font-medium text-gray-900">{connector.name}</div>
-                        <div className="text-sm text-gray-500">{connector.id}</div>
-                      </div>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -194,11 +185,6 @@ export default function ConnectorsPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm text-gray-600">
-                      {formatDate(connector.lastSynced)}
-                    </span>
-                  </TableCell>
-                  <TableCell>
                     <div>
                       <div className="text-sm font-medium text-gray-900">
                         {connector.userName || 'Unknown'}
@@ -209,19 +195,9 @@ export default function ConnectorsPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center">
-                      <span className="text-sm font-medium text-gray-900">
-                        {connector.dataCount?.toLocaleString() || '0'}
-                      </span>
-                      {connector.syncStatus && (
-                        <Badge 
-                          variant={connector.syncStatus === 'recent' ? 'success' : connector.syncStatus === 'never' ? 'error' : 'warning'} 
-                          className="ml-2 text-xs"
-                        >
-                          {connector.syncStatus}
-                        </Badge>
-                      )}
-                    </div>
+                    <span className="text-sm text-gray-600">
+                      {formatDate(connector.lastSynced)}
+                    </span>
                   </TableCell>
                   <TableCell>
                     <span className="text-sm text-gray-600">
